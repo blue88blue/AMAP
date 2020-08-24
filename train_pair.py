@@ -18,20 +18,20 @@ import time
 import torchsummary
 from torchvision.utils import save_image
 # models
-from model.classifer_base import classifer_base
+from model.classifer_base import classifer_base_pair
 
 
 
 
 def main(args, num_fold=0):
     # 模型选择
-    model = classifer_base(backbone=args.network, pretrained_base=args.pretrained, n_class=args.n_class, in_channel=args.in_channel)
+    model = classifer_base_pair(backbone=args.network, pretrained_base=args.pretrained, n_class=args.n_class, in_channel=args.in_channel)
 
     # 设备选择
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
-    if args.mode == "train" and num_fold <= 1:
-        torchsummary.summary(model, (3, args.crop_size[0], args.crop_size[1]))  # #输出网络结构和参数量
+    # if args.mode == "train" and num_fold <= 1:
+        # torchsummary.summary(model, (3, args.crop_size[0], args.crop_size[1]), (3, args.crop_size[0], args.crop_size[1]), (1))  # #输出网络结构和参数量
     print(f'   [network: {args.network}  device: {device}]')
 
     if args.mode == "train":
@@ -47,101 +47,7 @@ def main(args, num_fold=0):
 
 
 
-
-
 def train(model, device, args, num_fold=0):
-    dataset_train = AMAP_Dataset_Single(args.data_root, args.target_root, args.crop_size, "train",
-                                     k_fold=args.k_fold, num_fold=num_fold)
-    dataloader_train = DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True,
-                                  num_workers=args.num_workers, pin_memory=True)
-
-    dataset_val = AMAP_Dataset_Single(args.data_root, args.target_root, args.crop_size, "val",
-                                     k_fold=args.k_fold, num_fold=num_fold)
-    dataloader_val = DataLoader(dataset_val, batch_size=args.batch_size, shuffle=False,
-                                  num_workers=args.num_workers, pin_memory=True)
-
-
-    writer = SummaryWriter(log_dir=args.log_dir[num_fold], comment=f'tb_log')
-    opt = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
-
-    # 定义损失函数
-    # criterion = nn.CrossEntropyLoss(torch.tensor(args.class_weight, device=device))
-    criterion = nn.CrossEntropyLoss()
-
-    step = 0
-    for epoch in range(args.num_epochs):
-        model.train()
-        lr = utils.poly_learning_rate(args, opt, epoch)  # 学习率调节
-
-        with tqdm(total=len(dataset_train), desc=f'[Train] fold[{num_fold}/{args.k_fold}] Epoch[{epoch + 1}/{args.num_epochs} LR{lr:.8f}] ', unit='img') as pbar:
-            for batch in dataloader_train:
-                step += 1
-                # 读取训练数据
-                image, label = batch
-                assert len(image.size()) == 4
-
-                image = image.to(device, dtype=torch.float32)
-                label = label.to(device, dtype=torch.long)
-
-                # 前向传播
-                opt.zero_grad()
-                pred = model(image)
-
-                # 计算损失
-                totall_loss = criterion(pred, label)
-
-                totall_loss.backward()
-                opt.step()
-
-                if step % 5 == 0:
-                    writer.add_scalar("Train/Totall_loss", totall_loss.item(), step)
-
-                pbar.set_postfix(**{'loss': totall_loss.item()})  # 显示loss
-                pbar.update(image.size()[0])
-
-
-        if (epoch+1) % args.val_step == 0:
-            precision, recall, F1, weight_F1 = val(model, dataloader_val, len(dataset_val), device, args)
-            # 写入csv文件
-            val_result = [num_fold, epoch + 1, weight_F1, F1, recall, precision]
-            with open(args.val_result_file, "a") as f:
-                w = csv.writer(f)
-                w.writerow(val_result)
-
-            torch.save(model.state_dict(), os.path.join(args.checkpoint_dir[num_fold], f'CP_epoch{epoch + 1}.pth'))
-
-
-
-def val(model, dataloader, num_train_val,  device, args):
-    hist = 0
-    model.eval()
-    with torch.no_grad():
-        with tqdm(total=num_train_val, desc=f'VAL', unit='img') as pbar:
-            for batch in dataloader:
-                image, label = batch
-                image = image.to(device, dtype=torch.float32)
-                label = label.to(device, dtype=torch.long)
-
-                pred = model(image)
-                pred = F.softmax(pred, dim=1).max(dim=1)[1]  # 阈值处理
-
-                # 逐图片计算指标
-                hist += utils.fast_hist(label, pred, args.n_class)
-                pbar.update(image.size()[0])
-    # 验证集指标
-    precision, recall, F1, weight_F1 = utils.cal_classifer_scores(hist.cpu().numpy())
-    print(f"weight_F1:{weight_F1}|| F1:{F1} || recall:{recall} || precision:{precision}")
-
-    return precision, recall, F1, weight_F1
-
-
-
-
-
-
-
-
-def train_pair(model, device, args, num_fold=0):
     dataset_train = AMAP_Dataset_Pair(args.data_root, args.target_root, args.crop_size, "train",
                                      k_fold=args.k_fold, num_fold=num_fold)
     dataloader_train = DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True,
@@ -189,7 +95,7 @@ def train_pair(model, device, args, num_fold=0):
                     writer.add_scalar("Train/Totall_loss", totall_loss.item(), step)
 
                 pbar.set_postfix(**{'loss': totall_loss.item()})  # 显示loss
-                pbar.update(image.size()[0])
+                pbar.update(image1.size()[0])
 
 
         if (epoch+1) % args.val_step == 0:
@@ -204,22 +110,24 @@ def train_pair(model, device, args, num_fold=0):
 
 
 
-def val_pair(model, dataloader, num_train_val,  device, args):
+def val(model, dataloader, num_train_val,  device, args):
     hist = 0
     model.eval()
     with torch.no_grad():
         with tqdm(total=num_train_val, desc=f'VAL', unit='img') as pbar:
             for batch in dataloader:
-                image, label = batch
-                image = image.to(device, dtype=torch.float32)
+                image1, image2, label, time_diff = batch
+                image1 = image1.to(device, dtype=torch.float32)
+                image2 = image2.to(device, dtype=torch.float32)
+                time_diff = time_diff.to(device, dtype=torch.float32)
                 label = label.to(device, dtype=torch.long)
 
-                pred = model(image)
+                pred = model(image1, image2, time_diff)
                 pred = F.softmax(pred, dim=1).max(dim=1)[1]  # 阈值处理
 
                 # 逐图片计算指标
                 hist += utils.fast_hist(label, pred, args.n_class)
-                pbar.update(image.size()[0])
+                pbar.update(image1.size()[0])
     # 验证集指标
     precision, recall, F1, weight_F1 = utils.cal_classifer_scores(hist.cpu().numpy())
     print(f"weight_F1:{weight_F1}|| F1:{F1} || recall:{recall} || precision:{precision}")

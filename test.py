@@ -1,5 +1,5 @@
 
-from dataset.dataset_classifer import AMAP_Dataset_Single, AMAP_PredictDataset
+from dataset.dataset_single import AMAP_Dataset_Single, AMAP_PredictDataset
 import torch
 from model.deeplabv3_plus import DeepLabV3Plus
 

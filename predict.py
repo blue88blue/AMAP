@@ -1,4 +1,4 @@
-from dataset.dataset_classifer import AMAP_PredictDataset
+from dataset.dataset_single import AMAP_PredictDataset
 from torch.utils.data import DataLoader
 import torch
 import os
@@ -8,6 +8,7 @@ from settings import basic_setting
 import numpy as np
 from tqdm import tqdm
 import json
+from dataset.dataset_single import AMAP_PredictDataset
 from dataset.transform import *
 import csv
 #models
@@ -18,53 +19,39 @@ from model.classifer_base import classifer_base
 pred_data_root = '/home/sjh/dataset/AMAP-TECH/amap_traffic_test_0712'
 pred_annotations_root = '/home/sjh/dataset/AMAP-TECH/amap_traffic_annotations_test.json'
 pred_dir = 'amap_traffic_annotations_test_key.json'
-model_CPepoch = 20
+model_CPepoch = 40
 # #################################### predict settings 预测提交结果 ####################################
 
 
 def pred_single(model, device, args):
     with open(pred_annotations_root, 'r') as f:
         data = json.load(f)
-    num_data = len(data["annotations"])
+    dataset_pred = AMAP_PredictDataset(pred_data_root, pred_annotations_root, args.crop_size)
+    dataloader_pred = DataLoader(dataset_pred, batch_size=args.batch_size, shuffle=False,
+                                  num_workers=args.num_workers, pin_memory=True)
 
+    all_pred_status = np.zeros((len(data["annotations"]), args.n_class), dtype=np.int)
     model.eval()
-    with tqdm(total=num_data, desc=f'predict', unit='id') as pbar:
-        for i in range(num_data):
-            id = data["annotations"][i]["id"]
-            id_path = os.path.join(pred_data_root, id)
-            frames = data["annotations"][i]["frames"]
+    with tqdm(total=len(dataset_pred), desc=f'predict', unit='id') as pbar:
+        for batch in dataloader_pred:
+            # 读取数据
+            image, id = batch
+            image = image.to(device, dtype=torch.float32)
 
-            id_pred_status = []
-            key_frame_status = -1
-            for j in range(len(frames)):
-                # ############ 按id 读取图片############
-                image_file = frames[j]["frame_name"]
-                if image_file == data["annotations"][i]["key_frame"]:
-                    key_frame = True
-                else:
-                    key_frame = False
-                image_path = os.path.join(id_path, image_file)
-                image, _ = fetch(image_path)
-                image, _ = convert_to_tensor(image)
-                image, _ = scale(args.crop_size, image)
-                image = image.to(device, dtype=torch.float32)
-                image = image.unsqueeze(0)  # (1, 3, h, w)
-                # ############ 按id 读取图片############
-                with torch.no_grad():
-                    pred = model(image)
-                    pred = torch.softmax(pred, dim=1)
-                    pred_status = pred.max(dim=1)[1]
-                    id_pred_status.append(pred_status.item())
-                    if key_frame:
-                        key_frame_status = pred_status.item()
+            with torch.no_grad():
+                pred = model(image)
+                pred = torch.softmax(pred, dim=1)
+                pred_status = pred.max(dim=1)[1]
 
-            id_pred_status = np.array(id_pred_status)
-            status = np.argmax(np.bincount(id_pred_status))
-            data["annotations"][i]["status"] = int(status)
-            # data["annotations"][i]["status"] = int(key_frame_status)
+            for i in range(image.size()[0]):
+                index = id[i] - 1
+                id_status = pred_status[i].item()
+                all_pred_status[index, id_status] += 1
+            pbar.update(image.size()[0])
 
-            pbar.set_postfix(**{'status': status})
-            pbar.update(1)
+    for i in range(len(data["annotations"])):
+        status = np.argmax(np.bincount(all_pred_status[i, :]))
+        data["annotations"][i]["status"] = int(status)
 
     # 保存预测结果
     res2 = json.dumps(data, indent=4)

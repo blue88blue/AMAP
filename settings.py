@@ -6,7 +6,7 @@ from utils import utils
 class basic_setting():
 
     mode = "train"                             # train,  test, train_test
-    k_fold = 5                            # None 不交叉验证
+    k_fold = None                            # None 不交叉验证
     start_fold = 0                        # 中断后从哪一折重新开始训练
     end_fold = 4
 
@@ -24,13 +24,13 @@ class basic_setting():
     # #################################### model settings ####################################
     in_channel = 3
     n_class = 3
-    network = "resnet50"  # 模型名， 或实验名称
+    network = "resnet34"  # 模型名， 或实验名称
     note = ""
     pretrained = True
 
     # #################################### train settings ####################################
     class_weight = [0.3, 0.3, 0.3]
-    num_epochs = 100
+    num_epochs = 50
     batch_size = 4
     lr = 0.001
     momentum = 0.9
@@ -38,7 +38,7 @@ class basic_setting():
     # cuda_id = "0"
 
     # #################################### test settings ####################################
-    test_run_file = '2020-0821-1116_02_resnest50__fold_None'
+    test_run_file = '2020-0824-1240_00_resnet34__fold_None'
     label_names = ['bg', 'clear', 'slow', 'jam']
     plot = True
 

@@ -1,5 +1,6 @@
 
 import torch
+import math
 from .loss import BinaryDiceLoss
 import torch.nn as nn
 import numpy as np
@@ -63,7 +64,7 @@ def cal_classifer_scores(hist, weight=[0.2, 0.2, 0.6]):
 
     weight_F1 = np.array(weight) * F1
 
-    return precision.mean(), recall.mean(), F1.mean(), weight_F1.mean()
+    return precision.mean(), recall.mean(), F1.mean(), weight_F1.sum()
 
 # 保存打印指标
 def save_print_score(all_dice, all_iou, all_acc, all_sen, all_spe, file, label_names):
@@ -145,7 +146,26 @@ def get_dataset_filelist(data_root):
     return file_list
 
 
+# 将相邻的图片序列作为图片对
+def make_pairs(data_root):
+    with open(data_root, 'r') as f:
+        data = json.load(f)
+        data = data["annotations"]
 
+    pairs = []
+    for sample in data:
+        id = sample["id"]
+        status = int(sample["status"])
+        for i in range(len(sample["frames"]) - 1):
+            frame_name1 = sample["frames"][i]["frame_name"]
+            time1 = int(sample["frames"][i]["gps_time"])
+            frame_name2 = sample["frames"][i + 1]["frame_name"]
+            time2 = int(sample["frames"][i + 1]["gps_time"])
+
+            if math.fabs(time2 - time1) < 300:
+                pair = [id, status, frame_name1, frame_name2, time2 - time1]
+                pairs.append(pair)
+    return pairs
 
 
 

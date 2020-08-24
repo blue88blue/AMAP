@@ -80,6 +80,7 @@ def convert_to_tensor(image, label=None):
             label = label.unsqueeze(0)
     return image, label
 
+
 def scale(crop_size, image, label=None):
 
     image = F.interpolate(image.unsqueeze(0), size=crop_size, mode='bilinear', align_corners=True).squeeze(0)

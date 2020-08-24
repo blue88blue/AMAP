@@ -49,7 +49,7 @@ class AMAP_Dataset_Single(Dataset):
                 raise NotImplementedError
             print(f"{data_mode} dataset fold{num_fold}/{k_fold}: {len(self.image_files)} images")
 
-        print(self.image_files)
+        # print(self.image_files)
 
         with open(annotations_root, "r") as f:
             data = json.load(f)
@@ -80,7 +80,7 @@ class AMAP_Dataset_Single(Dataset):
 
         image, _ = scale(self.crop_size, image)
 
-        if self.data_mode == "test":  # 若测试数据， 同时输出文件名
+        if self.data_mode == "val":  # 若测试数据， 同时输出文件名
             return image, label, index
         return image, label
 
@@ -101,14 +101,14 @@ class AMAP_PredictDataset(Dataset):
 
     def __getitem__(self, idx):
         file = self.files[idx]
-        index = int(os.path.split(file)[0])-1
+        id = int(os.path.split(file)[0])
         image_path = os.path.join(self.data_root, file)
 
         image, _ = fetch(image_path)
         image, _ = convert_to_tensor(image)
         image, _ = scale(self.crop_size, image)
 
-        return image, index
+        return image, id
 
 
 
