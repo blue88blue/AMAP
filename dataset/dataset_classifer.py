@@ -49,6 +49,8 @@ class AMAP_Dataset_Single(Dataset):
                 raise NotImplementedError
             print(f"{data_mode} dataset fold{num_fold}/{k_fold}: {len(self.image_files)} images")
 
+        print(self.image_files)
+
         with open(annotations_root, "r") as f:
             data = json.load(f)
             self.label_file = data["annotations"]
@@ -107,4 +109,6 @@ class AMAP_PredictDataset(Dataset):
         image, _ = scale(self.crop_size, image)
 
         return image, index
+
+
 

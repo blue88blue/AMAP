@@ -51,6 +51,19 @@ def cal_scores(hist, smooth=1):
     return dice[1:]*100, iou[1:]*100, Precision*100, Sensitivity[1:]*100, Specificity[1:]*100  # 不包含背景
 
 
+def cal_classifer_scores(hist, weight=[0.2, 0.2, 0.6]):
+    TP = np.diag(hist)
+    FP = hist.sum(axis=0) - TP
+    FN = hist.sum(axis=1) - TP
+    TN = hist.sum() - TP - FP - FN
+
+    precision = TP / (TP + FP)
+    recall = TP / (TP + FN)
+    F1 = (2 * precision * recall)/(precision + recall)
+
+    weight_F1 = np.array(weight) * F1
+
+    return precision.mean(), recall.mean(), F1.mean(), weight_F1.mean()
 
 # 保存打印指标
 def save_print_score(all_dice, all_iou, all_acc, all_sen, all_spe, file, label_names):

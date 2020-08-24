@@ -6,7 +6,7 @@ from utils import utils
 class basic_setting():
 
     mode = "train"                             # train,  test, train_test
-    k_fold = None                            # None 不交叉验证
+    k_fold = 5                            # None 不交叉验证
     start_fold = 0                        # 中断后从哪一折重新开始训练
     end_fold = 4
 
@@ -59,7 +59,7 @@ class basic_setting():
             self.val_result_file = os.path.join(self.dir, "val_result.csv")
             with open(self.val_result_file, "a") as f:
                 w = csv.writer(f)
-                w.writerow(['fold', 'epoch', 'mDice', 'mIoU', 'mAcc', 'mSens', 'mSpec'])
+                w.writerow(['fold', 'epoch', 'weight_F1', 'F1', 'precision', 'recall'])
 
             # 日志保存文件夹
             self.log_dir = os.path.join(self.dir, "log")

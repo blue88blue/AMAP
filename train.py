@@ -53,7 +53,12 @@ def train(model, device, args, num_fold=0):
                                      k_fold=args.k_fold, num_fold=num_fold)
     dataloader_train = DataLoader(dataset_train, batch_size=args.batch_size, shuffle=True,
                                   num_workers=args.num_workers, pin_memory=True)
-    num_train_data = len(dataset_train)  # 训练数据大小
+
+    dataset_val = AMAP_Dataset_Single(args.data_root, args.target_root, args.crop_size, "val",
+                                     k_fold=args.k_fold, num_fold=num_fold)
+    dataloader_val = DataLoader(dataset_val, batch_size=args.batch_size, shuffle=False,
+                                  num_workers=args.num_workers, pin_memory=True)
+
 
     writer = SummaryWriter(log_dir=args.log_dir[num_fold], comment=f'tb_log')
     opt = torch.optim.SGD(model.parameters(), lr=args.lr, momentum=args.momentum, weight_decay=args.weight_decay)
@@ -67,7 +72,7 @@ def train(model, device, args, num_fold=0):
         model.train()
         lr = utils.poly_learning_rate(args, opt, epoch)  # 学习率调节
 
-        with tqdm(total=num_train_data, desc=f'[Train] fold[{num_fold}/{args.k_fold}] Epoch[{epoch + 1}/{args.num_epochs} LR{lr:.8f}] ', unit='img') as pbar:
+        with tqdm(total=len(dataset_train), desc=f'[Train] fold[{num_fold}/{args.k_fold}] Epoch[{epoch + 1}/{args.num_epochs} LR{lr:.8f}] ', unit='img') as pbar:
             for batch in dataloader_train:
                 step += 1
                 # 读取训练数据
@@ -95,7 +100,40 @@ def train(model, device, args, num_fold=0):
 
 
         if (epoch+1) % args.val_step == 0:
+            precision, recall, F1, weight_F1 = val(model, dataloader_val, len(dataset_val), device, args)
+            # 写入csv文件
+            val_result = [num_fold, epoch + 1, weight_F1, F1, recall, precision]
+            with open(args.val_result_file, "a") as f:
+                w = csv.writer(f)
+                w.writerow(val_result)
+
             torch.save(model.state_dict(), os.path.join(args.checkpoint_dir[num_fold], f'CP_epoch{epoch + 1}.pth'))
+
+
+
+def val(model, dataloader, num_train_val,  device, args):
+    hist = 0
+    model.eval()
+    with torch.no_grad():
+        with tqdm(total=num_train_val, desc=f'VAL', unit='img') as pbar:
+            for batch in dataloader:
+                image, label = batch
+                image = image.to(device, dtype=torch.float32)
+                label = label.to(device, dtype=torch.long)
+
+                pred = model(image)
+                pred = F.softmax(pred, dim=1).max(dim=1)[1]  # 阈值处理
+
+                # 逐图片计算指标
+                hist += utils.fast_hist(label, pred, args.n_class)
+                pbar.update(image.size()[0])
+    # 验证集指标
+    precision, recall, F1, weight_F1 = utils.cal_classifer_scores(hist.cpu().numpy())
+    print(f"weight_F1:{weight_F1}|| F1:{F1} || recall:{recall} || precision:{precision}")
+
+    return precision, recall, F1, weight_F1
+
+
 
 
 if __name__ == "__main__":

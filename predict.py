@@ -37,7 +37,7 @@ def pred_single(model, device, args):
             id_pred_status = []
             key_frame_status = -1
             for j in range(len(frames)):
-                # 按id 读取图片
+                # ############ 按id 读取图片############
                 image_file = frames[j]["frame_name"]
                 if image_file == data["annotations"][i]["key_frame"]:
                     key_frame = True
@@ -49,7 +49,7 @@ def pred_single(model, device, args):
                 image, _ = scale(args.crop_size, image)
                 image = image.to(device, dtype=torch.float32)
                 image = image.unsqueeze(0)  # (1, 3, h, w)
-
+                # ############ 按id 读取图片############
                 with torch.no_grad():
                     pred = model(image)
                     pred = torch.softmax(pred, dim=1)
@@ -57,6 +57,7 @@ def pred_single(model, device, args):
                     id_pred_status.append(pred_status.item())
                     if key_frame:
                         key_frame_status = pred_status.item()
+
             id_pred_status = np.array(id_pred_status)
             status = np.argmax(np.bincount(id_pred_status))
             data["annotations"][i]["status"] = int(status)
